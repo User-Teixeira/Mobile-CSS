@@ -109,7 +109,6 @@
         let pointerId = null;
 
         function onPointerDown(e) {
-            // Only one active drag at a time.
             if (pointerId !== null) return;
             pointerId = e.pointerId;
             moved = false;
@@ -180,26 +179,6 @@
 
     // ---------- Highlight overlay ----------
 
-    function ensureHighlightEl() {
-        let el = document.getElementById('mci-highlight-overlay');
-        if (!el) {
-            el = document.createElement('div');
-            el.id = 'mci-highlight-overlay';
-            document.body.appendChild(el);
-        }
-        return el;
-    }
-
-    function showHighlight(target) {
-        const el = ensureHighlightEl();
-        const rect = target.getBoundingClientRect();
-        el.style.display = 'block';
-        el.style.top = `${rect.top}px`;
-        el.style.left = `${rect.left}px`;
-        el.style.width = `${rect.width}px`;
-        el.style.height = `${rect.height}px`;
-    }
-
     // ---------- Element picking (tap) ----------
 
     function isOwnUI(el) {
@@ -211,8 +190,6 @@
         const target = e.target;
         if (isOwnUI(target)) return;
 
-        // Prevent the tap from also triggering SillyTavern's own click handlers
-        // (sending messages, opening menus, etc.) while in picker mode.
         e.preventDefault();
         e.stopPropagation();
 
@@ -283,7 +260,6 @@
         return label;
     }
 
-    // Full CSS selector for the element: tag + id + every class, no truncation.
     function getFullSelector(node) {
         let selector = node.tagName.toLowerCase();
         if (node.id) selector += `#${node.id}`;
@@ -301,11 +277,20 @@
 
         panel = document.createElement('div');
         panel.id = 'mci-panel';
+        
+        // 확장프로그램 외부 CSS 간섭을 줄이고 꽉 차지 않는 창 스타일 부여
+        panel.style.position = 'fixed';
+        panel.style.zIndex = '10000';
+        panel.style.display = 'none'; 
+        panel.style.flexDirection = 'column';
+        panel.style.boxSizing = 'border-box';
+        panel.style.overflow = 'hidden';
+
         panel.innerHTML = `
-            <div id="mci-panel-header">
+            <div id="mci-panel-header" style="cursor: move; touch-action: none; user-select: none;">
                 <div id="mci-panel-drag-handle"></div>
                 <div id="mci-panel-title">No element selected</div>
-                <div id="mci-panel-close">✕</div>
+                <div id="mci-panel-close" style="cursor: pointer;">✕</div>
             </div>
             <div id="mci-selector-row" class="mci-copy-row" data-prop="" data-val="">
                 <span id="mci-selector-text">—</span>
@@ -320,7 +305,9 @@
             <div id="mci-search-bar" style="display:none;">
                 <input id="mci-search-input" type="text" placeholder="Filter properties..." />
             </div>
-            <div id="mci-panel-body"></div>
+            <div id="mci-panel-body" style="overflow-y: auto; flex: 1;"></div>
+            
+            <div id="mci-panel-resizer" style="position: absolute; right: 0; bottom: 0; width: 16px; height: 16px; cursor: se-resize; touch-action: none; z-index: 10001; background: linear-gradient(135deg, transparent 70%, #888 70%);"></div>
         `;
         document.body.appendChild(panel);
 
@@ -346,71 +333,153 @@
             flashRow(row);
         });
 
+        // 위치 이동 드래그 및 크기 조절 리사이즈 기능 연결
         setupPanelDrag(panel);
+        setupPanelResize(panel);
 
         return panel;
     }
 
-    // [수정 사항 1 적용] 사용자가 드래그해서 저장한 높이를 최우선으로 복원하고 위치 계산
+    // [수정] 하단 강제 고정을 풀고, 저장된 크기와 위치(X, Y)를 실시간 복원하는 로직
     function positionPanel(panel) {
-        // 1. 로컬 스토리지에서 저장된 높이값 불러오기
-        const savedHeight = localStorage.getItem('mciPanelHeight');
-        if (savedHeight) {
-            panel.style.height = `${savedHeight}px`;
-            panel.style.maxHeight = `${savedHeight}px`;
+        const savedWidth = localStorage.getItem('mciPanelWidth') || '340';
+        const savedHeight = localStorage.getItem('mciPanelHeight') || '420';
+        
+        panel.style.width = `${savedWidth}px`;
+        panel.style.height = `${savedHeight}px`;
+        panel.style.maxHeight = 'none';
+
+        let savedLeft = localStorage.getItem('mciPanelLeft');
+        let savedTop = localStorage.getItem('mciPanelTop');
+
+        // 저장 기록이 없으면 화면 우측 하단 적정 구석에 최초 배치
+        if (savedLeft === null || savedTop === null) {
+            savedLeft = window.innerWidth - parseFloat(savedWidth) - 16;
+            savedTop = window.innerHeight - parseFloat(savedHeight) - 80;
+        } else {
+            savedLeft = parseFloat(savedLeft);
+            savedTop = parseFloat(savedTop);
         }
 
-        // 2. 사용자가 설정한 높이가 유효하면 우선 사용하고, 없으면 콘텐츠 자체 높이 사용
-        const userHeight = parseFloat(panel.style.height) || parseFloat(panel.style.maxHeight);
-        const actualHeight = panel.getBoundingClientRect().height;
-        const finalHeight = userHeight > 0 ? userHeight : actualHeight;
+        // 창이 화면 밖으로 탈출하지 않도록 보정
+        savedLeft = Math.min(Math.max(0, savedLeft), window.innerWidth - parseFloat(savedWidth));
+        savedTop = Math.min(Math.max(0, savedTop), window.innerHeight - parseFloat(savedHeight));
 
-        // 3. 화면 하단에 고정되도록 top 위치 계산
-        const top = Math.max(0, window.innerHeight - finalHeight);
-        panel.style.top = `${top}px`;
-
-        // 콘텐츠 양이 줄어들더라도 높이를 유지하여 창이 뜨지 않게 고정
-        if (userHeight > 0) {
-            panel.style.height = `${finalHeight}px`;
-        }
+        panel.style.left = `${savedLeft}px`;
+        panel.style.top = `${savedTop}px`;
     }
 
-    // [수정 사항 2 적용] 패널을 드래그하여 크기를 조절할 때 실시간 반영 및 마우스/터치를 뗐을 때 크기 저장
+    // [수정] 상단 헤더 영역을 드래그하여 패널 전체를 상하좌우(X, Y)로 이동시키는 함수
     function setupPanelDrag(panel) {
         const header = panel.querySelector('#mci-panel-header');
-        let startY = 0;
-        let startHeight = 0;
+        let startX = 0, startY = 0;
+        let originLeft = 0, originTop = 0;
         let dragging = false;
 
-        header.addEventListener('touchstart', (e) => {
-            dragging = true;
-            startY = e.touches[0].clientY;
-            startHeight = panel.getBoundingClientRect().height;
-        }, { passive: true });
-
-        header.addEventListener('touchmove', (e) => {
-            if (!dragging) return;
-            const dy = startY - e.touches[0].clientY;
-            const vh = window.innerHeight;
-            let newHeight = startHeight + dy;
-            newHeight = Math.max(80, Math.min(vh * 0.85, newHeight));
+        function onPointerDown(e) {
+            if (e.target.id === 'mci-panel-close') return; // 닫기 버튼은 제외
             
-            panel.style.height = `${newHeight}px`; // 높이 값 명시적 지정
-            panel.style.maxHeight = `${newHeight}px`;
-            panel.style.top = `${Math.max(0, vh - newHeight)}px`;
-        }, { passive: true });
+            dragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            const rect = panel.getBoundingClientRect();
+            originLeft = rect.left;
+            originTop = rect.top;
 
-        header.addEventListener('touchend', () => {
+            header.setPointerCapture(e.pointerId);
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerup', onPointerUp);
+        }
+
+        function onPointerMove(e) {
+            if (!dragging) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            let newLeft = originLeft + dx;
+            let newTop = originTop + dy;
+
+            const rect = panel.getBoundingClientRect();
+            newLeft = Math.min(Math.max(0, newLeft), window.innerWidth - rect.width);
+            newTop = Math.min(Math.max(0, newTop), window.innerHeight - rect.height);
+
+            panel.style.left = `${newLeft}px`;
+            panel.style.top = `${newTop}px`;
+        }
+
+        function onPointerUp(e) {
+            if (!dragging) return;
             dragging = false;
-            // 드래그 조작이 완료되었을 때 최종 조절된 높이를 브라우저에 기록
-            if (panel.style.height) {
-                localStorage.setItem('mciPanelHeight', parseFloat(panel.style.height));
-            }
-        });
+            try { header.releasePointerCapture(e.pointerId); } catch (err) {}
+            document.removeEventListener('pointermove', onPointerMove);
+            document.removeEventListener('pointerup', onPointerUp);
+
+            // 최종 이동 좌표 로컬 스토리지에 박제
+            localStorage.setItem('mciPanelLeft', parseFloat(panel.style.left));
+            localStorage.setItem('mciPanelTop', parseFloat(panel.style.top));
+        }
+
+        header.addEventListener('pointerdown', onPointerDown);
+    }
+
+    // [신설] 우측 하단 모서리를 마우스나 손가락으로 밀고 당겨 크기를 조절하는 함수
+    function setupPanelResize(panel) {
+        const resizer = panel.querySelector('#mci-panel-resizer');
+        let startX = 0, startY = 0;
+        let startWidth = 0, startHeight = 0;
+        let resizing = false;
+
+        function onPointerDown(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            resizing = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            
+            const rect = panel.getBoundingClientRect();
+            startWidth = rect.width;
+            startHeight = rect.height;
+
+            resizer.setPointerCapture(e.pointerId);
+            document.addEventListener('pointermove', onPointerMove);
+            document.addEventListener('pointerup', onPointerUp);
+        }
+
+        function onPointerMove(e) {
+            if (!resizing) return;
+            const dx = e.clientX - startX;
+            const dy = e.clientY - startY;
+
+            let newWidth = startWidth + dx;
+            let newHeight = startHeight + dy;
+
+            // 크기 제한 (최소 너비 240px, 최소 높이 180px 및 화면 크기 한도 내 조절)
+            newWidth = Math.max(240, Math.min(window.innerWidth - parseFloat(panel.style.left || 0), newWidth));
+            newHeight = Math.max(180, Math.min(window.innerHeight - parseFloat(panel.style.top || 0), newHeight));
+
+            panel.style.width = `${newWidth}px`;
+            panel.style.height = `${newHeight}px`;
+        }
+
+        function onPointerUp(e) {
+            if (!resizing) return;
+            resizing = false;
+            try { resizer.releasePointerCapture(e.pointerId); } catch (err) {}
+            document.removeEventListener('pointermove', onPointerMove);
+            document.removeEventListener('pointerup', onPointerUp);
+
+            // 최종 크기 로컬 스토리지에 박제
+            localStorage.setItem('mciPanelWidth', parseFloat(panel.style.width));
+            localStorage.setItem('mciPanelHeight', parseFloat(panel.style.height));
+        }
+
+        resizer.addEventListener('pointerdown', onPointerDown);
     }
 
     function openPanel() {
         const panel = ensurePanelEl();
+        panel.style.display = 'flex'; // 확실한 노출 처리
         panel.classList.add('open');
         positionPanel(panel);
         requestAnimationFrame(() => positionPanel(panel));
@@ -418,7 +487,10 @@
 
     function closePanel() {
         const panel = document.getElementById('mci-panel');
-        if (panel) panel.classList.remove('open');
+        if (panel) {
+            panel.style.display = 'none';
+            panel.classList.remove('open');
+        }
         pinnedElement = null;
         hideHighlight();
     }
@@ -442,8 +514,7 @@
             pathEl.innerHTML = '';
             selectorText.textContent = '—';
             renderBody();
-            if (panel.classList.contains('open')) positionPanel(panel);
-            return;
+            return; // [버그 수정] 다른 요소 클릭 시 좌표 초기화 명령문(positionPanel) 제거
         }
 
         title.textContent = describeNode(pinnedElement);
@@ -466,7 +537,7 @@
         });
 
         renderBody();
-        if (panel.classList.contains('open')) positionPanel(panel);
+        // [버그 수정] 다른 요소 클릭 시 좌표 초기화 명령문(positionPanel) 제거
     }
 
     function renderBody() {
@@ -599,6 +670,28 @@
         } else {
             fallbackCopy(text);
         }
+    }
+
+    // ---------- Highlight overlay ----------
+
+    function ensureHighlightEl() {
+        let el = document.getElementById('mci-highlight-overlay');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'mci-highlight-overlay';
+            document.body.appendChild(el);
+        }
+        return el;
+    }
+
+    function showHighlight(target) {
+        const el = ensureHighlightEl();
+        const rect = target.getBoundingClientRect();
+        el.style.display = 'block';
+        el.style.top = `${rect.top}px`;
+        el.style.left = `${rect.left}px`;
+        el.style.width = `${rect.width}px`;
+        el.style.height = `${rect.height}px`;
     }
 
     function fallbackCopy(text) {
