@@ -1,0 +1,252 @@
+/* Mobile CSS Inspector - styles */
+
+.mci-floating-toggle {
+    position: fixed;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #2a2a2a;
+    color: #4caf50;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000000;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    font-size: 20px;
+    cursor: pointer;
+    touch-action: none;
+    user-select: none;
+    border: 2px solid rgba(76, 175, 80, 0.5);
+}
+
+.mci-floating-toggle.active {
+    color: #fff;
+    background: #4caf50;
+    box-shadow: 0 0 0 4px rgba(76, 175, 80, 0.3), 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.mci-floating-toggle.mci-dragging {
+    opacity: 0.75;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.6);
+}
+
+#mci-highlight-overlay {
+    position: fixed;
+    pointer-events: none;
+    z-index: 999998;
+    border: 2px solid #4caf50;
+    background: rgba(76, 175, 80, 0.2);
+    box-sizing: border-box;
+    display: none;
+    transition: all 0.05s ease-out;
+}
+
+#mci-panel {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    max-height: 55vh;
+    background: #1e1e1e;
+    color: #e0e0e0;
+    font-family: 'SF Mono', 'Consolas', monospace;
+    font-size: 12px;
+    z-index: 999999;
+    display: none;
+    flex-direction: column;
+    border-top: 2px solid #4caf50;
+    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.5);
+}
+
+#mci-panel.open {
+    display: flex;
+}
+
+#mci-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    background: #2a2a2a;
+    border-bottom: 1px solid #444;
+    flex-shrink: 0;
+    touch-action: none;
+}
+
+#mci-panel-drag-handle {
+    width: 40px;
+    height: 4px;
+    background: #666;
+    border-radius: 2px;
+    margin: 0 auto;
+    position: absolute;
+    left: 50%;
+    top: 4px;
+    transform: translateX(-50%);
+}
+
+#mci-panel-title {
+    font-weight: bold;
+    color: #4caf50;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    flex: 1;
+    margin-right: 8px;
+}
+
+#mci-panel-close {
+    cursor: pointer;
+    padding: 2px 8px;
+    color: #ccc;
+    font-size: 16px;
+    line-height: 1;
+}
+
+#mci-panel-tabs {
+    display: flex;
+    background: #252525;
+    border-bottom: 1px solid #444;
+    flex-shrink: 0;
+}
+
+.mci-tab-btn {
+    flex: 1;
+    padding: 8px 4px;
+    text-align: center;
+    color: #999;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    user-select: none;
+}
+
+.mci-tab-btn.active {
+    color: #4caf50;
+    border-bottom-color: #4caf50;
+}
+
+#mci-panel-body {
+    overflow-y: auto;
+    padding: 8px 12px 24px 12px;
+    flex: 1;
+    -webkit-overflow-scrolling: touch;
+}
+
+.mci-section-title {
+    color: #888;
+    text-transform: uppercase;
+    font-size: 10px;
+    margin: 10px 0 4px 0;
+    letter-spacing: 0.5px;
+}
+
+.mci-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 3px 0;
+    border-bottom: 1px solid #2a2a2a;
+    gap: 8px;
+}
+
+.mci-row .mci-prop {
+    color: #9cdcfe;
+    flex-shrink: 0;
+}
+
+.mci-row .mci-val {
+    color: #ce9178;
+    text-align: right;
+    word-break: break-all;
+}
+
+.mci-copy-row {
+    cursor: pointer;
+}
+
+.mci-copy-row:active {
+    background: #333;
+}
+
+#mci-box-model {
+    margin: 8px auto;
+    text-align: center;
+    font-size: 11px;
+}
+
+.mci-box-margin, .mci-box-border, .mci-box-padding, .mci-box-content {
+    margin: 0 auto;
+    padding: 14px;
+    text-align: center;
+}
+
+.mci-box-margin {
+    background: rgba(246, 178, 107, 0.25);
+    color: #f6b26b;
+}
+
+.mci-box-border {
+    background: rgba(255, 229, 153, 0.2);
+    color: #ffe599;
+}
+
+.mci-box-padding {
+    background: rgba(147, 196, 125, 0.2);
+    color: #93c47d;
+}
+
+.mci-box-content {
+    background: rgba(106, 168, 218, 0.25);
+    color: #6fa8dc;
+    min-width: 60px;
+}
+
+.mci-box-label {
+    position: absolute;
+    font-size: 9px;
+    opacity: 0.8;
+}
+
+#mci-no-selection {
+    color: #777;
+    text-align: center;
+    padding: 24px 12px;
+}
+
+#mci-element-path {
+    font-size: 10px;
+    color: #777;
+    padding: 4px 12px;
+    background: #1a1a1a;
+    border-bottom: 1px solid #333;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    flex-shrink: 0;
+}
+
+#mci-element-path span {
+    cursor: pointer;
+    color: #9cdcfe;
+}
+
+#mci-element-path span.mci-current {
+    color: #4caf50;
+}
+
+#mci-search-bar {
+    padding: 6px 12px;
+    flex-shrink: 0;
+    border-bottom: 1px solid #333;
+}
+
+#mci-search-input {
+    width: 100%;
+    box-sizing: border-box;
+    background: #2a2a2a;
+    border: 1px solid #444;
+    color: #e0e0e0;
+    padding: 6px 8px;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 12px;
+}
