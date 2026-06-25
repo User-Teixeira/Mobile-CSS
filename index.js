@@ -335,6 +335,18 @@
         return panel;
     }
 
+    // Recompute and apply an explicit pixel `top` so the panel stays anchored
+    // to the bottom of the real viewport, even if an ancestor element (e.g. an
+    // unrelated extension applying a CSS transform to <html>) has turned itself
+    // into the containing block for our `position: fixed` elements. Relying on
+    // `bottom: 0` alone breaks in that scenario; an explicit `top` computed
+    // from window.innerHeight does not.
+    function positionPanel(panel) {
+        const maxHeightPx = panel.getBoundingClientRect().height || parseFloat(panel.style.maxHeight) || 0;
+        const top = Math.max(0, window.innerHeight - maxHeightPx);
+        panel.style.top = `${top}px`;
+    }
+
     function setupPanelDrag(panel) {
         const header = panel.querySelector('#mci-panel-header');
         let startY = 0;
@@ -354,6 +366,7 @@
             let newHeight = startHeight + dy;
             newHeight = Math.max(80, Math.min(vh * 0.85, newHeight));
             panel.style.maxHeight = `${newHeight}px`;
+            panel.style.top = `${Math.max(0, vh - newHeight)}px`;
         }, { passive: true });
 
         header.addEventListener('touchend', () => {
@@ -364,6 +377,11 @@
     function openPanel() {
         const panel = ensurePanelEl();
         panel.classList.add('open');
+        positionPanel(panel);
+        // getBoundingClientRect() above forces a synchronous reflow so this is
+        // normally already correct, but re-checking on the next frame guards
+        // against any edge case where the initial height read was stale.
+        requestAnimationFrame(() => positionPanel(panel));
     }
 
     function closePanel() {
@@ -390,6 +408,7 @@
             title.textContent = 'No element selected';
             pathEl.innerHTML = '';
             renderBody();
+            if (panel.classList.contains('open')) positionPanel(panel);
             return;
         }
 
@@ -412,6 +431,7 @@
         });
 
         renderBody();
+        if (panel.classList.contains('open')) positionPanel(panel);
     }
 
     function renderBody() {
@@ -571,6 +591,8 @@
 
         window.addEventListener('resize', () => {
             if (pinnedElement) showHighlight(pinnedElement);
+            const panel = document.getElementById('mci-panel');
+            if (panel && panel.classList.contains('open')) positionPanel(panel);
         });
     }
 

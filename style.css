@@ -45,7 +45,13 @@
     position: fixed;
     left: 0;
     right: 0;
-    bottom: 0;
+    /* top is set dynamically via JS (see positionPanel()) instead of relying on
+       `bottom: 0`, because some SillyTavern extensions apply a CSS transform to
+       <html>. Any transform on an ancestor turns it into the containing block
+       for our `position: fixed` panel, so `bottom: 0` ends up anchored to that
+       ancestor's box instead of the real viewport and the panel renders
+       off-screen (e.g. far above the visible area). Setting an explicit
+       pixel `top` computed from window.innerHeight sidesteps that entirely. */
     max-height: 55vh;
     background: #1e1e1e;
     color: #e0e0e0;
