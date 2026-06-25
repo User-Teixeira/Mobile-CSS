@@ -200,11 +200,6 @@
         el.style.height = `${rect.height}px`;
     }
 
-    function hideHighlight() {
-        const el = document.getElementById('mci-highlight-overlay');
-        if (el) el.style.display = 'none';
-    }
-
     // ---------- Element picking (tap) ----------
 
     function isOwnUI(el) {
@@ -289,8 +284,6 @@
     }
 
     // Full CSS selector for the element: tag + id + every class, no truncation.
-    // This is what you'd actually paste into a stylesheet, unlike describeNode()
-    // above which is intentionally shortened for the breadcrumb trail.
     function getFullSelector(node) {
         let selector = node.tagName.toLowerCase();
         if (node.id) selector += `#${node.id}`;
@@ -358,18 +351,31 @@
         return panel;
     }
 
-    // Recompute and apply an explicit pixel `top` so the panel stays anchored
-    // to the bottom of the real viewport, even if an ancestor element (e.g. an
-    // unrelated extension applying a CSS transform to <html>) has turned itself
-    // into the containing block for our `position: fixed` elements. Relying on
-    // `bottom: 0` alone breaks in that scenario; an explicit `top` computed
-    // from window.innerHeight does not.
+    // [수정 사항 1 적용] 사용자가 드래그해서 저장한 높이를 최우선으로 복원하고 위치 계산
     function positionPanel(panel) {
-        const maxHeightPx = panel.getBoundingClientRect().height || parseFloat(panel.style.maxHeight) || 0;
-        const top = Math.max(0, window.innerHeight - maxHeightPx);
+        // 1. 로컬 스토리지에서 저장된 높이값 불러오기
+        const savedHeight = localStorage.getItem('mciPanelHeight');
+        if (savedHeight) {
+            panel.style.height = `${savedHeight}px`;
+            panel.style.maxHeight = `${savedHeight}px`;
+        }
+
+        // 2. 사용자가 설정한 높이가 유효하면 우선 사용하고, 없으면 콘텐츠 자체 높이 사용
+        const userHeight = parseFloat(panel.style.height) || parseFloat(panel.style.maxHeight);
+        const actualHeight = panel.getBoundingClientRect().height;
+        const finalHeight = userHeight > 0 ? userHeight : actualHeight;
+
+        // 3. 화면 하단에 고정되도록 top 위치 계산
+        const top = Math.max(0, window.innerHeight - finalHeight);
         panel.style.top = `${top}px`;
+
+        // 콘텐츠 양이 줄어들더라도 높이를 유지하여 창이 뜨지 않게 고정
+        if (userHeight > 0) {
+            panel.style.height = `${finalHeight}px`;
+        }
     }
 
+    // [수정 사항 2 적용] 패널을 드래그하여 크기를 조절할 때 실시간 반영 및 마우스/터치를 뗐을 때 크기 저장
     function setupPanelDrag(panel) {
         const header = panel.querySelector('#mci-panel-header');
         let startY = 0;
@@ -388,12 +394,18 @@
             const vh = window.innerHeight;
             let newHeight = startHeight + dy;
             newHeight = Math.max(80, Math.min(vh * 0.85, newHeight));
+            
+            panel.style.height = `${newHeight}px`; // 높이 값 명시적 지정
             panel.style.maxHeight = `${newHeight}px`;
             panel.style.top = `${Math.max(0, vh - newHeight)}px`;
         }, { passive: true });
 
         header.addEventListener('touchend', () => {
             dragging = false;
+            // 드래그 조작이 완료되었을 때 최종 조절된 높이를 브라우저에 기록
+            if (panel.style.height) {
+                localStorage.setItem('mciPanelHeight', parseFloat(panel.style.height));
+            }
         });
     }
 
@@ -401,9 +413,6 @@
         const panel = ensurePanelEl();
         panel.classList.add('open');
         positionPanel(panel);
-        // getBoundingClientRect() above forces a synchronous reflow so this is
-        // normally already correct, but re-checking on the next frame guards
-        // against any edge case where the initial height read was stale.
         requestAnimationFrame(() => positionPanel(panel));
     }
 
@@ -549,8 +558,6 @@
         if (el.attributes.length === 0) {
             html += '<div id="mci-no-selection">속성이 없습니다.</div>';
         } else {
-            // Surface id/class first since those are usually what you need
-            // most when writing CSS selectors; the rest follow in DOM order.
             const priority = ['id', 'class'];
             const attrs = Array.from(el.attributes);
             attrs.sort((a, b) => {
@@ -611,6 +618,11 @@
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
             .replace(/"/g, '&quot;');
+    }
+
+    function hideHighlight() {
+        const el = document.getElementById('mci-highlight-overlay');
+        if (el) el.style.display = 'none';
     }
 
     // ---------- Init ----------
