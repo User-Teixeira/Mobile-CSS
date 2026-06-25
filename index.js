@@ -288,6 +288,18 @@
         return label;
     }
 
+    // Full CSS selector for the element: tag + id + every class, no truncation.
+    // This is what you'd actually paste into a stylesheet, unlike describeNode()
+    // above which is intentionally shortened for the breadcrumb trail.
+    function getFullSelector(node) {
+        let selector = node.tagName.toLowerCase();
+        if (node.id) selector += `#${node.id}`;
+        if (node.classList && node.classList.length) {
+            selector += '.' + Array.from(node.classList).join('.');
+        }
+        return selector;
+    }
+
     // ---------- Panel rendering ----------
 
     function ensurePanelEl() {
@@ -301,6 +313,10 @@
                 <div id="mci-panel-drag-handle"></div>
                 <div id="mci-panel-title">No element selected</div>
                 <div id="mci-panel-close">✕</div>
+            </div>
+            <div id="mci-selector-row" class="mci-copy-row" data-prop="" data-val="">
+                <span id="mci-selector-text">—</span>
+                <span id="mci-selector-copy-hint">tap to copy</span>
             </div>
             <div id="mci-element-path"></div>
             <div id="mci-panel-tabs">
@@ -328,6 +344,13 @@
 
         panel.querySelector('#mci-search-input').addEventListener('input', () => {
             renderBody();
+        });
+
+        panel.querySelector('#mci-selector-row').addEventListener('click', () => {
+            if (!pinnedElement) return;
+            const row = panel.querySelector('#mci-selector-row');
+            copyToClipboard(getFullSelector(pinnedElement));
+            flashRow(row);
         });
 
         setupPanelDrag(panel);
@@ -403,16 +426,19 @@
 
         const title = panel.querySelector('#mci-panel-title');
         const pathEl = panel.querySelector('#mci-element-path');
+        const selectorText = panel.querySelector('#mci-selector-text');
 
         if (!pinnedElement) {
             title.textContent = 'No element selected';
             pathEl.innerHTML = '';
+            selectorText.textContent = '—';
             renderBody();
             if (panel.classList.contains('open')) positionPanel(panel);
             return;
         }
 
         title.textContent = describeNode(pinnedElement);
+        selectorText.textContent = getFullSelector(pinnedElement);
 
         const path = getElementPath(pinnedElement);
         pathEl.innerHTML = path
@@ -523,7 +549,19 @@
         if (el.attributes.length === 0) {
             html += '<div id="mci-no-selection">속성이 없습니다.</div>';
         } else {
-            Array.from(el.attributes).forEach((attr) => {
+            // Surface id/class first since those are usually what you need
+            // most when writing CSS selectors; the rest follow in DOM order.
+            const priority = ['id', 'class'];
+            const attrs = Array.from(el.attributes);
+            attrs.sort((a, b) => {
+                const ai = priority.indexOf(a.name);
+                const bi = priority.indexOf(b.name);
+                if (ai === -1 && bi === -1) return 0;
+                if (ai === -1) return 1;
+                if (bi === -1) return -1;
+                return ai - bi;
+            });
+            attrs.forEach((attr) => {
                 html += rowHtml(attr.name, attr.value || '(empty)');
             });
         }

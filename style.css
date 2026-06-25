@@ -218,6 +218,35 @@
     padding: 24px 12px;
 }
 
+#mci-selector-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 12px;
+    background: #233323;
+    border-bottom: 1px solid #333;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+#mci-selector-text {
+    font-weight: bold;
+    color: #8fd98f;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    flex: 1;
+}
+
+#mci-selector-copy-hint {
+    font-size: 9px;
+    color: #6a8f6a;
+    text-transform: uppercase;
+    flex-shrink: 0;
+    white-space: nowrap;
+}
+
 #mci-element-path {
     font-size: 10px;
     color: #777;
